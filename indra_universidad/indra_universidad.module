@@ -1,0 +1,360 @@
+<?php
+
+$file_config = variable_get('cofig_generic_indraweb_path', false);
+if ($file_config && file_exists($file_config)) {
+  require_once $file_config;
+}
+
+function indra_universidad_menu() {
+  $items['aprendernoshacemejores/participa'] = array(
+    'title' => 'Subscriptions',
+    'page callback' => 'indra_universidad_form_show',
+    'access callback' => TRUE,
+    'type' => MENU_CALLBACK,
+  );
+  $items['universidad/voting/ajax'] = array(
+    'page callback' => 'indra_universidad_voting_ajax',
+    'access callback' => TRUE,
+    'file' => 'indra_universidad_voting.inc',
+    'type' => MENU_CALLBACK,
+  );
+  $items['aprendernoshacemejores/contacta'] = array(
+    'title' => 'Contact',
+    'page callback' => 'indra_universidad_form_contact_show',
+    'access callback' => TRUE,
+    'type' => MENU_CALLBACK,
+  );
+  return $items;
+}
+
+function indra_universidad_form_show() {
+  $output = '<div class="titulo-form">' . t('Fill in the following form and share your story with us.') . '</div>';
+  $form = drupal_render(drupal_get_form('forms_foruni_form'));
+  $output .= '<div>' . $form . '</div><div class="back-home"><span> </span><a href="' . url('aprendernoshacemejores') . '">' . t('Back Home') . '</a></div>';
+  return $output;
+}
+
+function indra_universidad_form_contact_show() {
+  return drupal_render(drupal_get_form('indra_universidad_contact_form'));
+}
+
+/**
+ * Función de retorno para la página forms_foruni_form.
+ */
+function forms_foruni_form($form_state) {
+  $form['nombre'] = array(
+    '#type' => 'textfield',
+    '#title' => t('First name'),
+    '#required' => TRUE,
+    '#attributes' => array(
+      'placeholder' => t('First name'),
+    ),
+    '#element_validate' => array('indra_helper_validate_lenght'),
+    '#maxlength' => 256,
+    '#prefix' => '<div class="campo-iz">',
+  );
+  $form['apellido'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Surname'),
+    '#required' => TRUE,
+    '#attributes' => array(
+      'placeholder' => t('Surname'),
+    ),
+    '#element_validate' => array('indra_helper_validate_lenght'),
+    '#maxlength' => 256,
+  );
+  $form['dni/nie'] = array(
+    '#type' => 'textfield',
+    '#title' => t('National/Foreign ID'),
+    '#required' => TRUE,
+    '#attributes' => array(
+      'placeholder' => t('National/Foreign ID'),
+    ),
+    '#element_validate' => array('indra_helper_validate_lenght'),
+    '#maxlength' => 20,
+  );
+  $form['ciudad'] = array(
+    '#type' => 'textfield',
+    '#title' => t('City'),
+    '#required' => TRUE,
+    '#attributes' => array(
+      'placeholder' => t('City'),
+    ),
+    '#element_validate' => array('indra_helper_validate_lenght'),
+    '#maxlength' => 100,
+  );
+  $form['mail'] = array(
+    '#type' => 'textfield',
+    '#title' => t('E-Mail'),
+    '#maxlength' => 250,
+    '#required' => TRUE,
+    '#attributes' => array(
+      'placeholder' => t('E-Mail'),
+    ),
+    '#element_validate' => array('indra_helper_validate_lenght', 'indra_helper_validate_mail'),
+    '#suffix' => '</div>',
+  );
+
+  $form['testimony'] = array(
+    '#type' => 'textarea',
+    '#title' => t('Message'),
+    '#cols' => 36,
+    '#rows' => 4,
+    '#required' => TRUE,
+    '#attributes' => array(
+      'placeholder' => t('maximum 280 characters'),
+      'maxlength' => 280,
+    ),
+    '#prefix' => '<div class="campo-der">',
+    '#description' => t('Only @ncharacter characters are allowed. You remain for writing:', array('@ncharacter' => 280)) . ' (<span id="textarea-lenght-contador">280</span>)',
+  );
+  $form['file'] = array(
+    '#type' => 'managed_file',
+    '#title' => t('Attach image'),
+    '#upload_validators' => array(
+      'file_validate_size' => array(1 * 1024 * 1024),
+      'indra_helper_validate_upload' => array('png gif jpg jpeg tiff'),
+    ),
+    '#upload_location' => 'public://teaser_universidad',
+    '#preview' => TRUE,
+    '#required' => TRUE,
+    '#description' => t('Permitted file types are: ') . 'png gif jpg jpeg tiff. ' . t('Maximum size allowed @size.', array('@size' => '1MB')),
+    '#suffix' => '</div>',
+  );
+
+  $form['accept_policy'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('Yes'),
+    '#required' => TRUE,
+    '#description' => l(t('I accept the terms and privacy policy initiative.'), '/aprendernoshacemejores/bases-concurso', array('attributes' => array('class' => array('privacity-link'), 'target' => '_blank'))),
+  );
+  $form['my_captcha_element'] = array(
+    '#type' => 'captcha',
+    '#captcha_type' => 'image_captcha/Image',
+  );
+  $form['submit'] = array(
+    '#type' => 'submit',
+    '#attributes' => array('class' => array('no-border-radius')),
+    '#value' => t('Submit'),
+  );
+  return $form;
+}
+
+/**
+ * Envío de formulario
+ */
+function forms_foruni_form_submit($form, &$form_state) {
+  global $language;
+  $file = file_load($form_state['values']['file']);
+  $file->status = FILE_STATUS_PERMANENT;
+
+  file_save($file);
+  $file->display = 1;
+  $file->description = "";
+
+  $node = new stdClass();
+  $values = $form_state['values'];
+  $node->uid = '1';
+  $node->type = 'universidad';
+  $node->created = time() - (rand(1, 240) * 60);
+  $node->title = $values['nombre'];
+  $node->status = 1;
+  $node->promote = 0;
+  $node->sticky = 0;
+  $node->language = $language->language;
+  $node->body[$node->language][0]['value'] = substr($values['testimony'], 0, 280);
+  $node->field_nombreuni['und'][0]['value'] = $values['nombre'];
+  $node->field_apellidouni['und'][0]['value'] = $values['apellido'];
+  $node->field_ciudaduni['und'][0]['value'] = $values['ciudad'];
+  $nif = preg_replace('/[^A-Za-z0-9]/i', '', $values['dni/nie']);
+  $node->field_dniuni['und'][0]['value'] = strtoupper($nif);
+  $node->field_mailuni['und'][0]['value'] = $values['mail'];
+  $node->field_estadouni['und'][0]['value'] = 5;
+  $node->field_imagenuni['und'][0] = (array) $file;
+  $node->body[$node->language][0]['format'] = 'full_html';
+
+  // se añader del empleado de Indra si los hubiese.
+  $person = PersonUni::nif($node);
+  if ($person) {
+    $node = $person;
+  }
+  $node = PersonUni::previousTestimony($node);
+
+  node_submit($node);
+  node_save($node);
+  $form_state['redirect'] = 'aprendernoshacemejores';
+  drupal_set_message(t('Thanks for participating! You will shortly receive an email confirming the publication of your story.'));
+}
+
+/**
+ * Implementa hook_node_update()
+ */
+function indra_universidad_node_update($node) {
+  $mail = new MailUni($node);
+  $result = $mail->mailAndStatus();
+  if ($result) {
+    $node = $result;
+    node_save($node);
+  }
+}
+
+/**
+ * Implementa hook_mail()
+ */
+function indra_universidad_mail($key, &$message, $params) {
+  switch ($key) {
+    case 'indra_universidad_mail_send':
+    case 'mail_contact_universidad':
+      $message['subject'] = $params['subject'] . ' - indracompany';
+      $message['body'][] = $params['body'];
+      $message['headers']['Content-Type'] = 'text/html; charset=UTF-8; format=flowed';
+      if (isset($params['reply-to'])) {
+        $message['headers']['Reply-To'] = $params['reply-to'];
+      }
+      break;
+  }
+}
+
+/**
+ * Implementa hook_init()
+ */
+function indra_universidad_init() {
+  //  correcting captcha
+  if (isset($_POST['captcha_sid'])) {
+    $posted_captcha_sid = $_POST['captcha_sid'];
+    $expected_captcha_token = db_query(
+        "SELECT token FROM {captcha_sessions} WHERE csid = :csid", array(':csid' => $posted_captcha_sid)
+        )->fetchField();
+    $_POST['captcha_token'] = $expected_captcha_token;
+    $_POST['debug_captcha_token'] = $expected_captcha_token;
+  }
+
+  // carga lo necesario para el sistema de votaciones.
+  drupal_session_start();
+  drupal_add_js(array('indra_universidad_voting' => $_SESSION['voting']), 'setting');
+
+  $module_path = drupal_get_path('module', 'indra_universidad');
+  drupal_add_js($module_path . '/js/indra_universidad.js', 'file');
+}
+
+/**
+ * Implementa hook_form()
+ */
+function indra_universidad_contact_form($form, &$form_state) {
+  global $language;
+
+  $privacity = translation_path_get_translations('node/' . variable_get('node_privacy_policy', 40697));
+  $form = array();
+
+  if (is_numeric($nid_professional)) {
+    $node = node_load($nid_professional);
+    if ($node) {
+      $form['contact_information'] = array(
+        '#markup' => '<p>' . t('For') . ' ' . $node->title . '.</p>',
+      );
+    }
+    else {
+      drupal_set_message(t('At present it is not possible to contact this professional. Sorry for the inconvenience.'));
+      return;
+    }
+  }
+
+  $form['your_name'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Name:'),
+    '#maxlength' => 256,
+    '#size' => 256,
+    '#element_validate' => array('indra_helper_validate_lenght'),
+    '#required' => TRUE,
+  );
+  $form['last_name'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Last Name:'),
+    '#size' => 256,
+    '#element_validate' => array('indra_helper_validate_lenght'),
+    '#maxlength' => 256,
+  );
+  $form['email'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Email:'),
+    '#size' => 256,
+    '#element_validate' => array('indra_helper_validate_lenght', 'indra_helper_validate_mail'),
+    '#maxlength' => 256,
+    '#required' => TRUE,
+  );
+  $form['country'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Country:'),
+    '#size' => 256,
+    '#element_validate' => array('indra_helper_validate_lenght'),
+    '#maxlength' => 256,
+    '#required' => TRUE,
+  );
+  $form['subject'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Subject:'),
+    '#size' => 256,
+    '#element_validate' => array('indra_helper_validate_lenght'),
+    '#maxlength' => 256,
+    '#required' => TRUE,
+  );
+  $form['message'] = array(
+    '#title' => t('Message:'),
+    '#type' => 'textarea',
+    '#element_validate' => array('indra_helper_validate_lenght'),
+    '#maxlength' => 500,
+    '#rows' => 8,
+    '#required' => TRUE,
+  );
+  $form['accept_policy'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('Yes'),
+    '#required' => TRUE,
+    '#description' => t('I have read and accept the data policy ') . l(t('data policy'), '/aprendernoshacemejores/informacion-legal', array('attributes' => array('class' => array('privacity-link'), 'target' => '_blank'))),
+  );
+  $form['captcha_element'] = array(
+    '#type' => 'captcha',
+    '#captcha_type' => 'image_captcha/Image',
+  );
+
+  $form['submit'] = array(
+    '#type' => 'submit',
+    '#value' => t('Submit'),
+  );
+  return $form;
+}
+
+/**
+ * Implementa hook_submit()
+ * @param array $form
+ * @param array $form_state
+ */
+function indra_universidad_contact_form_submit($form, &$form_state) {
+  global $language;
+  $to = 'aprendernoshacemejores@indra.es';
+  $body = '';
+
+  $exclude = array('submit', 'form_build_id', 'form_token', 'form_id', 'op');
+  foreach ($form_state['values'] as $key => $value) {
+    if (in_array($key, $exclude)) {
+      continue;
+    }
+    if (isset($form_state['complete form'][$key]['#title'])) {
+      $body .= '<br />' . $form_state['complete form'][$key]['#title'] . ' - ' . $value . '<br />';
+    }
+  }
+
+  $params = array('body' => $body);
+  if ($form_state['values']['email'] != '') {
+    $params['reply-to'] = $form_state['values']['email'];
+  }
+  // título del mensaje
+  $params['subject'] = t('Learnig make us better.', array(), array('langcode' => $language->language));
+  // envío
+  if ($body != '') {
+    $message = drupal_mail('indra_universidad', 'mail_contact_universidad', $to, $language->language, $params);
+    if ($message['result']) {
+      drupal_set_message(t('Your message has been sent.'));
+    }
+  }
+}

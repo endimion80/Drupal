@@ -1,0 +1,12 @@
+name = Universidad Indra
+description = 'Universidad Indra.'
+package = "Indra"
+core = 7.x
+version = "7.x-1.0-dev"
+core = "7.x"
+files[] = indra_universidad.module
+files[] = indra_universidad_voting.inc
+files[] = class/MailUni.php
+files[] = class/PersonUni.php
+
+
