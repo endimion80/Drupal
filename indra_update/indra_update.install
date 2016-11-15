@@ -1,0 +1,5 @@
+<?php
+function indra_update_install() {
+    indra_update_size_field("field_audiencia", 512);  
+    indra_update_size_field("field_participacion_indra", 512);
+}

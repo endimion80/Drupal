@@ -1,0 +1,6 @@
+package = "Indra"
+name = "Indra update"
+description = "Módulo para actualizaciones de Indra Company."
+version = "7.x-0.1"
+core = "7.x"
+files[] = indra_update.module
